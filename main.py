@@ -160,22 +160,16 @@ class BankingAgent:
                 config = {"configurable": {"session_id": session_id}}
                 response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
 
-                print("DEBUG RESPONSE:", response)  # <-- para ver la estructura real
+                print("DEBUG RESPONSE TYPE:", type(response))
+                print("DEBUG RESPONSE CONTENT:", response)
 
                 if isinstance(response, dict):
-                    if "output" in response:
-                        text_res = response["output"]
-                    elif "return_values" in response and isinstance(response["return_values"], dict):
-                        text_res = response["return_values"].get("output")
-                    elif "result" in response:
-                        text_res = response["result"]
-                    else:
-                        text_res = str(response)
+                    text_res = response.get("output") \
+                    or response.get("result") \
+                    or response.get("return_values", {}).get("output") \
+                    or "Lo siento, no pude procesar tu solicitud."
                 else:
-                    text_res = str(response) if response else None
-
-                if not text_res or not isinstance(text_res, str):
-                    text_res = "Lo siento, no pude procesar tu solicitud."
+                    text_res = str(response) if response else "Lo siento, no pude procesar tu solicitud."
 
                 # TTS
                 audio_filename = f"{uuid.uuid4()}.mp3"
