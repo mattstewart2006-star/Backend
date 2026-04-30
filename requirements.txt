@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+librosa
+numpy
+joblib
+soundfile
+gtts
+groq
+langchain
+langchain_groq
+langchain_core
+langchain_community
