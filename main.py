@@ -163,7 +163,7 @@ class BankingAgent:
                 return {
                     "usuario_dijo": transcription,
                     "agente_dijo": text_res,
-                    "url_audio": f"http://127.0.0.1:8000/static/{audio_filename}"
+                    "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"
                 }
             except Exception as e:
                 return {"error": "Error interno", "detalle": str(e)}
