@@ -55,11 +55,13 @@ def verificar_liveness(file_bytes):
 
 # --- 3. TOOLS (HERRAMIENTAS) ---
 from langchain_groq import ChatGroq
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents import create_tool_calling_agent
+from langchain.agents.agent import AgentExecutor
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
 from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import SQLChatMessageHistory
+
 
 
 @tool
