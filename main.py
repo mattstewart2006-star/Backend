@@ -19,7 +19,7 @@ client = Groq()
 USER_DATA = {
     "nombre": "Matthew",
     "balance": 15000.0,
-    "password": "BanorteSeguro"  # Contraseña simulada
+    "password": "banorte seguro"  # Contraseña simulada
 }
 
 try:
@@ -152,7 +152,9 @@ class BankingAgent:
                 # LLM Processing
                 config = {"configurable": {"session_id": session_id}}
                 response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-                text_res = response["output"]
+                text_res = response.get("output") if response else None 
+                if not text_res:
+                    text_res = "Lo siento, no pude procesar tu solicitud."
 
                 # TTS
                 audio_filename = f"{uuid.uuid4()}.mp3"
