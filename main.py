@@ -157,8 +157,15 @@ class BankingAgent:
                 # LLM Processing
                 config = {"configurable": {"session_id": session_id}}
                 response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
+                
+                print("DEBUG RESPONSE:", response) 
                 if isinstance(response, dict):
-                    text_res = response.get("output")
+                    if "output" in response:
+                        text_res = response["output"]
+                    elif "return_values" in response and isinstance(response["return_values"], dict):
+                        text_res = response["return_values"].get("output")
+                    else:
+                        text_res = str(response)
                 else:
                     text_res = str(response) if response else None
 
