@@ -117,7 +117,8 @@ class BankingAgent:
             ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}."
                        "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes."
                        "Cuando el usuario pide una transferencia mayor a 1000, primero confirma el monto y responde que necesita la contraseña."
-                       "Solo después de que el usuario proporcione la contraseña, valida la operación con bank_fraud_check."
+                       "No intentes completar la operación sin contraseña. Espera a que el usuario la proporcione."
+                       "Después de recibir la contraseña, valida la operación con bank_fraud_check."
                        "Sé amable y conciso."),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
