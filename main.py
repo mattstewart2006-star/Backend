@@ -86,12 +86,13 @@ def bank_fraud_check(amount: float, password: str = None) -> str:
     """Verifica si una transferencia es riesgosa y pide contraseña si es necesario."""
     if amount > 1000:
         if password is None:
-            return "Riesgo ALTO: Se requiere contraseña para continuar."
+            # En vez de error, devuelve instrucción clara
+            return f"La transferencia de ${amount} requiere contraseña. Por favor proporciónala."
         elif password == USER_DATA["password"]:
-            return "Transferencia validada con contraseña."
+            return f"Transferencia de ${amount} validada con contraseña."
         else:
             return "Contraseña incorrecta. Operación bloqueada."
-    return "Riesgo BAJO: Operación segura."
+    return f"Transferencia de ${amount} segura. No se requiere contraseña."
 
 
 # --- 4. AGENTE BANCARIO ---
@@ -115,7 +116,8 @@ class BankingAgent:
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}."
                        "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes."
-                       "Usa la herramienta de fraude SOLO si el monto es mayor a 1000."
+                       "Cuando el usuario pide una transferencia mayor a 1000, primero confirma el monto y responde que necesita la contraseña."
+                       "Solo después de que el usuario proporcione la contraseña, valida la operación con bank_fraud_check."
                        "Sé amable y conciso."),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
