@@ -171,6 +171,7 @@ class BankingAgent:
 
 # --- 5. INICIALIZACIÓN ---
 app = FastAPI(title="Agente Bancario Pro")
+origins = ["https://mattstewart2006-star.github.io"]
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
