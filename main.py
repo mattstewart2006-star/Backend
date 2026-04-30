@@ -116,10 +116,9 @@ class BankingAgent:
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}."
                        "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes."
-                       "Cuando el usuario pide una transferencia mayor a 1000, primero confirma el monto y responde que necesita la contraseña."
-                       "No intentes completar la operación sin contraseña. Espera a que el usuario la proporcione."
-                       "Después de recibir la contraseña, valida la operación con bank_fraud_check."
-                       "Sé amable y conciso."),
+                       "Si el usuario pide una transferencia mayor a 1000 sin contraseña, responde con un mensaje claro solicitando la contraseña."
+                       "Cuando el usuario proporcione la contraseña, valida la operación con bank_fraud_check."
+                       "Nunca devuelvas una respuesta vacía. Sé amable y conciso."),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
@@ -160,19 +159,22 @@ class BankingAgent:
                 # LLM Processing
                 config = {"configurable": {"session_id": session_id}}
                 response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-                
-                print("DEBUG RESPONSE:", response) 
+
+                print("DEBUG RESPONSE:", response)  # <-- para ver la estructura real
+
                 if isinstance(response, dict):
                     if "output" in response:
                         text_res = response["output"]
                     elif "return_values" in response and isinstance(response["return_values"], dict):
                         text_res = response["return_values"].get("output")
+                    elif "result" in response:
+                        text_res = response["result"]
                     else:
                         text_res = str(response)
                 else:
                     text_res = str(response) if response else None
 
-                if not text_res:
+                if not text_res or not isinstance(text_res, str):
                     text_res = "Lo siento, no pude procesar tu solicitud."
 
                 # TTS
