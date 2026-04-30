@@ -84,7 +84,7 @@ def realizar_retiro(amount: float) -> str:
 @tool
 def bank_fraud_check(amount: float, password: str = None) -> str:
     """Verifica si una transferencia es riesgosa y pide contraseña si es necesario."""
-    if amount > 10000:
+    if amount > 1000:
         if password is None:
             return "Riesgo ALTO: Se requiere contraseña para continuar."
         elif password == USER_DATA["password"]:
