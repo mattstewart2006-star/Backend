@@ -147,10 +147,10 @@ class BankingAgent:
                     model="whisper-large-v3",
                     response_format="text",
                 )
-                if isinstance(transcription_result, dict):
-                    transcription_text = transcription_result.get("text", "")
+                if isinstance(transcription, dict):
+                    transcription_text = transcription.get("text", "")
                 else:
-                    transcription_text = str(transcription_result)
+                    transcription_text = str(transcription)
                 transcription = limpiar_transcripcion(transcription)
 
                 # LLM Processing
