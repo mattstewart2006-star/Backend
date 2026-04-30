@@ -151,7 +151,7 @@ class BankingAgent:
                     transcription_text = transcription.get("text", "")
                 else:
                     transcription_text = str(transcription)
-                transcription = limpiar_transcripcion(transcription)
+                transcription = limpiar_transcripcion(transcription_text)
 
                 # LLM Processing
                 config = {"configurable": {"session_id": session_id}}
