@@ -114,11 +114,13 @@ class BankingAgent:
         self.llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}."
-                       "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes."
-                       "Si el usuario pide una transferencia mayor a 1000 sin contraseña, responde con un mensaje claro solicitando la contraseña."
-                       "Cuando el usuario proporcione la contraseña, valida la operación con bank_fraud_check."
-                       "Nunca devuelvas una respuesta vacía. Sé amable y conciso."),
+            ("system",f"Eres un asistente bancario para {USER_DATA['nombre']}."
+               "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes."
+               "Ejemplos:"
+               "Usuario: '¿Cuál es mi balance?' → Usa la herramienta get_user_info."
+               "Usuario: 'Quiero retirar 500 pesos' → Usa la herramienta realizar_retiro con amount=500."
+               "Usuario: 'Transferir 2000 pesos' → Usa bank_fraud_check con amount=2000 y solicita contraseña."
+               "Nunca devuelvas una respuesta vacía. Sé amable y conciso."),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
