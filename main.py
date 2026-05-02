@@ -13,7 +13,7 @@ from gtts import gTTS
 from groq import Groq
 
 # --- 1. CONFIGURACIÓN E INFORMACIÓN DE USUARIO ---
-os.environ["GROQ_API_KEY"] = "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"
+os.environ["GROQ_API_KEY"] = "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"
 client = Groq()
 
 USER_DATA = {
