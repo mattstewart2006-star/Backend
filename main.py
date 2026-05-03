@@ -65,7 +65,8 @@ from langchain_community.chat_message_histories import SQLChatMessageHistory
 
 @tool
 def get_user_info(query: str = None) -> str:
-    """Consulta el nombre del usuario y su balance actual de cuenta."""
+    """Útil para cuando el usuario pregunta por su saldo, balance, cuánto dinero tiene, 
+    quién es él o información general de su cuenta bancaria."""
     return f"El usuario se llama {USER_DATA['nombre']} y su balance actual es de ${USER_DATA['balance']}."
 
 
@@ -153,8 +154,15 @@ class BankingAgent:
 
                 # LLM Processing
                 config = {"configurable": {"session_id": session_id}}
-                response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-                text_res = response["output"]
+                try:
+                    response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
+                    text_res = response.get("output", "Lo siento, no pude procesar esa solicitud.") 
+    
+                    if not text_res: # Si viene vacío
+                        text_res = "Entendido, ¿hay algo más en lo que pueda ayudarte?"
+                except Exception as e:
+                    text_res = "Tuve un problema técnico, ¿puedes repetir?"
+                    print(f"Error en Agente: {e}")
 
                 # TTS
                 audio_filename = f"{uuid.uuid4()}.mp3"
