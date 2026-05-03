@@ -119,7 +119,7 @@ class BankingAgent:
             1. Si el usuario quiere transferir pero NO ha dicho a quién o cuánto, NO uses la herramienta 'realizar_retiro'. Pregúntale educadamente el dato que falta.
             2. Una vez que tengas el MONTO y el DESTINATARIO, usa la herramienta 'realizar_retiro' inmediatamente.
             3. No inventes nombres ni montos.
-            4. Responde siempre en español de forma concisa.""",
+            4. Responde siempre en español de forma concisa."""),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
