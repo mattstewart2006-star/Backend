@@ -71,15 +71,15 @@ def get_user_info(query: str = None) -> str:
 
 
 @tool
-def realizar_retiro(amount: float) -> str:
-    """Útil para retirar dinero, hacer transferencias, enviar pagos o mover fondos. 
-    Requiere el monto numérico (amount)."""
+def realizar_retiro(amount: float, destinatario: str = "su propia cuenta") -> str:
+    """Útil para retirar dinero, realizar transferencias, enviar pagos o mover fondos. 
+    Requiere el monto numérico (amount). Si se menciona un nombre, pásalo como destinatario."""
     if amount <= 0:
         return "Monto inválido."
     if amount > USER_DATA["balance"]:
-        return "Fondos insuficientes."
+        return "Fondos insuficientes en la cuenta."
     USER_DATA["balance"] -= amount
-    return f"Retiro exitoso de ${amount}. Nuevo balance: ${USER_DATA['balance']}."
+    return f"Retiro/Transferencia exitosa de ${amount} a {destinatario}. Nuevo balance: ${USER_DATA['balance']}."
 
 
 @tool
@@ -111,19 +111,20 @@ def limpiar_transcripcion(texto: str) -> str:
 class BankingAgent:
     def __init__(self):
         self.router = APIRouter(prefix="/agent", tags=["AI Agent"])
+        # Aumentamos un poco la temperatura para evitar bloqueos y forzamos el tool_choice
         self.llm = ChatGroq(
             model="llama-3.1-8b-instant", 
-            temperature=0,
-            model_kwargs={"tool_choice": "auto"} # Fuerza al modelo a considerar herramientas
-            )
+            temperature=0.1,
+            model_kwargs={"tool_choice": "auto"}
+        )
 
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}. "
-               "TU REGLA DE ORO: Si el usuario quiere mover dinero, DEBES usar la herramienta 'realizar_retiro'. "
-               "No confirmes transacciones que no hayas ejecutado a través de una herramienta. "
-               "Si el usuario pide una 'transferencia', trátala como un 'retiro' de su cuenta. "
-               "Si el usuario pide ver el balance o saber el saldo, usa la herramienta 'get_user_info'"
-               "Sé amable y conciso."),
+            ("system", f"""Eres un asistente bancario experto para {USER_DATA['nombre']}.
+            REGLAS CRÍTICAS:
+            1. Para consultar saldo o balance: usa 'get_user_info'.
+            2. Para enviar, transferir o retirar dinero: usa 'realizar_retiro'.
+            3. Si el usuario no da un monto, pídelo amablemente.
+            4. Responde siempre en español de forma breve."""),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
@@ -131,7 +132,12 @@ class BankingAgent:
 
         self.tools = [get_user_info, bank_fraud_check, realizar_retiro]
         agent = create_tool_calling_agent(self.llm, self.tools, self.prompt)
-        self.executor = AgentExecutor(agent=agent, tools=self.tools, verbose=True)
+        self.executor = AgentExecutor(
+            agent=agent, 
+            tools=self.tools, 
+            verbose=True,
+            handle_parsing_errors=True # CRÍTICO: Evita el "Problema técnico" si el LLM se equivoca en el formato
+        )
 
         self.agent_with_memory = RunnableWithMessageHistory(
             self.executor,
@@ -157,22 +163,24 @@ class BankingAgent:
                 )
                 transcription = limpiar_transcripcion(transcription)
 
-                # LLM Processing
+                # LLM Processing con protección total contra NoneType
                 config = {"configurable": {"session_id": session_id}}
                 try:
-                    response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-                    text_res = response.get("output", "Lo siento, no pude procesar esa solicitud.") 
-    
-                    if not text_res: # Si viene vacío
+                    full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
+                    text_res = full_response.get("output")
+                    
+                    if not text_res:
                         text_res = "Entendido, ¿hay algo más en lo que pueda ayudarte?"
                 except Exception as e:
-                    text_res = "Tuve un problema técnico, ¿puedes repetir?"
-                    print(f"Error en Agente: {e}")
+                    print(f"Error interno del Agente: {e}")
+                    text_res = "Lo siento, tuve un problema al procesar esa acción. ¿Podrías intentarlo de nuevo?"
 
                 # TTS
                 audio_filename = f"{uuid.uuid4()}.mp3"
                 audio_path = os.path.join("static", audio_filename)
-                tts = gTTS(text=text_res, lang='es')
+                
+                # Aseguramos que gTTS nunca reciba un None
+                tts = gTTS(text=str(text_res), lang='es')
                 tts.save(audio_path)
 
                 return {
@@ -181,7 +189,7 @@ class BankingAgent:
                     "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"
                 }
             except Exception as e:
-                return {"error": "Error interno", "detalle": str(e)}
+                return {"error": "Error de servidor", "detalle": str(e)}
 
 
 # --- 5. INICIALIZACIÓN ---
