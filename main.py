@@ -19,7 +19,7 @@ client = Groq()
 USER_DATA = {
     "nombre": "Matthew",
     "balance": 15000.0,
-    "password": "banorte seguro"  # Contraseña simulada
+    "password": "BanorteSeguro"  # Contraseña simulada
 }
 
 try:
@@ -84,15 +84,14 @@ def realizar_retiro(amount: float) -> str:
 @tool
 def bank_fraud_check(amount: float, password: str = None) -> str:
     """Verifica si una transferencia es riesgosa y pide contraseña si es necesario."""
-    if amount > 1000:
+    if amount > 10000:
         if password is None:
-            # En vez de error, devuelve instrucción clara
-            return f"La transferencia de ${amount} requiere contraseña. Por favor proporciónala."
+            return "Riesgo ALTO: Se requiere contraseña para continuar."
         elif password == USER_DATA["password"]:
-            return f"Transferencia de ${amount} validada con contraseña."
+            return "Transferencia validada con contraseña."
         else:
             return "Contraseña incorrecta. Operación bloqueada."
-    return f"Transferencia de ${amount} segura. No se requiere contraseña."
+    return "Riesgo BAJO: Operación segura."
 
 
 # --- 4. AGENTE BANCARIO ---
@@ -114,13 +113,9 @@ class BankingAgent:
         self.llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
 
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system",f"Eres un asistente bancario para {USER_DATA['nombre']}."
-               "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes."
-               "Ejemplos:"
-               "Usuario: '¿Cuál es mi balance?' → Usa la herramienta get_user_info."
-               "Usuario: 'Quiero retirar 500 pesos' → Usa la herramienta realizar_retiro con amount=500."
-               "Usuario: 'Transferir 2000 pesos' → Usa bank_fraud_check con amount=2000 y solicita contraseña."
-               "Nunca devuelvas una respuesta vacía. Sé amable y conciso."),
+            ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}. "
+                       "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes. "
+                       "Sé amable y conciso."),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
@@ -152,26 +147,12 @@ class BankingAgent:
                     model="whisper-large-v3",
                     response_format="text",
                 )
-                if isinstance(transcription, dict):
-                    transcription_text = transcription.get("text", "")
-                else:
-                    transcription_text = str(transcription)
-                transcription = limpiar_transcripcion(transcription_text)
+                transcription = limpiar_transcripcion(transcription)
 
                 # LLM Processing
                 config = {"configurable": {"session_id": session_id}}
                 response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-
-                print("DEBUG RESPONSE TYPE:", type(response))
-                print("DEBUG RESPONSE CONTENT:", response)
-
-                if isinstance(response, dict):
-                    text_res = response.get("output") \
-                    or response.get("result") \
-                    or response.get("return_values", {}).get("output") \
-                    or "Lo siento, no pude procesar tu solicitud."
-                else:
-                    text_res = str(response) if response else "Lo siento, no pude procesar tu solicitud."
+                text_res = response["output"]
 
                 # TTS
                 audio_filename = f"{uuid.uuid4()}.mp3"
