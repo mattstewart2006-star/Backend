@@ -123,7 +123,7 @@ class BankingAgent:
             ("system", f"""Eres el asistente virtual de Banorte para {USER_DATA['nombre']}.
 
 REGLAS DE RESPUESTA:
-1. Si el usuario pide su saldo, usa `get_user_info`.
+1. i el usuario pide su saldo, balance o informacion de cuenta, SIEMPRE llama a `get_user_info` y usa exactamente el texto devuelto como respuesta final..
 2. Si el usuario pide retirar o transferir dinero, identifica el monto y el destinatario y llama `realizar_retiro(amount, destinatario)`.
 3. Si el monto es mayor a 1000, PRIMERO llama `bank_fraud_check(amount, password)`:
    - Si la respuesta es "Transferencia validada con contraseña", procede a `realizar_retiro`.
@@ -186,6 +186,7 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
                         if not text_res:
                             steps = full_response.get("intermediate_steps")
                             if steps and isinstance(steps, list) and len(steps) > 0:
+                                # Aquí tomas el resultado textual de la última tool
                                 text_res = steps[-1][1]
 
                     if not text_res:
