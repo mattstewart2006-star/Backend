@@ -164,51 +164,42 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
             try:
                 file_bytes = await file.read()
                 es_real, confianza = verificar_liveness(file_bytes)
-
                 if es_real == 0:
                     return {"error": "ACCESO DENEGADO", "agente_dijo": "Detección de spoofing activada."}
-
+        # --- Transcripción con Groq ---
                 transcription = client.audio.transcriptions.create(
-                    file=(file.filename, file_bytes),
-                    model="whisper-large-v3",
-                    response_format="text",
-                )
+                file=(file.filename, file_bytes),
+                model="whisper-large-v3",
+                response_format="text",)
                 transcription = limpiar_transcripcion(transcription)
-
                 config = {"configurable": {"session_id": session_id}}
-
                 try:
                     full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
                     text_res = None
-
                     if isinstance(full_response, dict):
                         text_res = full_response.get("output")
                         if not text_res:
                             steps = full_response.get("intermediate_steps")
                             if steps and isinstance(steps, list) and len(steps) > 0:
-                                # Aquí tomas el resultado textual de la última tool
+                                # Log extra para depuración
+                                print(f"⚠️ Output vacío, usando intermediate_steps: {steps[-1]}")
                                 text_res = steps[-1][1]
-
                     if not text_res:
                         text_res = "Operación finalizada. ¿Deseas algo más?"
-
                 except Exception as e:
                     print(f"🔴 Error crítico en Agente: {e}")
                     text_res = "Tuve un problema técnico al consultar tu información."
-
+                # --- Conversión a voz ---
                 tts = gTTS(text=str(text_res), lang='es')
                 audio_filename = f"{uuid.uuid4()}.mp3"
                 audio_path = os.path.join("static", audio_filename)
                 tts.save(audio_path)
-
                 return {
-                    "usuario_dijo": transcription,
-                    "agente_dijo": text_res,
-                    "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"
-                }
-
-            except Exception as e:
-                return {"error": "Error interno", "detalle": str(e)}
+                "usuario_dijo": transcription,
+                "agente_dijo": text_res,
+                "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"}
+        except Exception as e:
+            return {"error": "Error interno", "detalle": str(e)}
 
 
 # --- 5. INICIALIZACIÓN ---
