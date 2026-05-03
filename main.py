@@ -35,22 +35,29 @@ if not os.path.exists("static"):
 # --- 2. LÓGICA DE ANTISPOOFING ---
 def verificar_liveness(file_bytes):
     try:
-        audio_data = io.BytesIO(file_bytes)
-        data, sr = sf.read(audio_data)
-        if len(data.shape) > 1:
-            data = np.mean(data, axis=1)
+        # Convertir a WAV PCM 16 bits, mono, 44.1 kHz
+        y, sr = librosa.load(io.BytesIO(file_bytes), sr=44100, mono=True)
+        temp_path = "temp_liveness.wav"
+        sf.write(temp_path, y, sr, subtype="PCM_16")
 
-        mfccs = librosa.feature.mfcc(y=data, sr=sr, n_mfcc=40)
+        # Extraer características
+        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
         mfccs_scaled = np.mean(mfccs.T, axis=0)
-        rolloff = librosa.feature.spectral_rolloff(y=data, sr=sr)
+        rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
         rolloff_scaled = np.mean(rolloff)
         features = np.hstack([mfccs_scaled, rolloff_scaled]).reshape(1, -1)
 
+        # Predicción con el modelo
         prediccion = MODELO_LIVENESS.predict(features)[0]
         probabilidades = MODELO_LIVENESS.predict_proba(features)[0]
         return prediccion, probabilidades[prediccion]
-    except Exception:
+
+    except Exception as e:
+        print(f"⚠️ Error en liveness: {e}")
         return None, 0
+    finally:
+        if os.path.exists("temp_liveness.wav"):
+            os.remove("temp_liveness.wav")
 
 
 # --- 3. TOOLS (HERRAMIENTAS OPTIMIZADAS) ---
@@ -64,24 +71,19 @@ from langchain_community.chat_message_histories import SQLChatMessageHistory
 
 @tool
 def get_user_info() -> str:
-    """Útil para cuando el usuario pregunta por su saldo, balance o quién es él. 
-    No requiere argumentos."""
     return f"El usuario se llama {USER_DATA['nombre']} y su balance actual es de ${USER_DATA['balance']}."
 
 @tool
 def realizar_retiro(amount: float, destinatario: str) -> str:
-    """Ejecuta un retiro o transferencia. 
-    IMPORTANTE: Solo llamar si tienes AMBOS: el monto (amount) y el nombre de la persona (destinatario)."""
     if amount <= 0:
         return "Error: El monto debe ser mayor a cero."
     if amount > USER_DATA["balance"]:
         return f"Fondos insuficientes. Tu saldo actual es {USER_DATA['balance']}."
-    
     USER_DATA["balance"] -= amount
-    return f"OK. Transferencia de ${amount} a {destinatario} realizada. Saldo restante: ${USER_DATA['balance']}."
+    return f"Transferencia de ${amount} a {destinatario} exitosa. Tu nuevo saldo es ${USER_DATA['balance']}."
+
 @tool
 def bank_fraud_check(amount: float, password: str = None) -> str:
-    """Verifica si una transferencia es riesgosa."""
     if amount > 1000:
         if password is None:
             return "Riesgo ALTO: Se requiere contraseña para continuar."
@@ -97,7 +99,6 @@ def get_session_history(session_id: str):
     return SQLChatMessageHistory(session_id=session_id, connection_string="sqlite:///banco.db")
 
 def limpiar_transcripcion(texto: str) -> str:
-    # Quitar acentos y normalizar a ASCII para evitar errores de Unicode en las Tools
     texto = unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode('ascii')
     texto = texto.strip().lower()
     texto = texto.replace("retirar", "retiro").replace("transferir", "transferencia")
@@ -107,7 +108,7 @@ class BankingAgent:
     def __init__(self):
         self.router = APIRouter(prefix="/agent", tags=["AI Agent"])
         self.llm = ChatGroq(
-            model="llama-3.1-8b-instant", 
+            model="llama-3.1-8b-instant",
             temperature=0.1,
             model_kwargs={"tool_choice": "auto"}
         )
@@ -116,17 +117,17 @@ class BankingAgent:
             ("system", f"""Eres el asistente virtual de Banorte para {USER_DATA['nombre']}.
 
 REGLAS DE RESPUESTA:
-1. Si el usuario pide su saldo, usa `get_user_info` y responde con el balance actual.
-2. Si el usuario pide retirar o transferir dinero, identifica el monto y el destinatario en el texto y llama `realizar_retiro(amount, destinatario)`.
+1. Si el usuario pide su saldo, usa `get_user_info`.
+2. Si el usuario pide retirar o transferir dinero, identifica el monto y el destinatario y llama `realizar_retiro(amount, destinatario)`.
 3. Si el monto es mayor a 1000, PRIMERO llama `bank_fraud_check(amount, password)`:
-   - Si la respuesta es "Transferencia validada con contraseña", entonces procede a `realizar_retiro`.
-   - Si la respuesta es "Riesgo ALTO: Se requiere contraseña para continuar", NO ejecutes `realizar_retiro` y pide la contraseña al usuario.
-   - Si la respuesta es "Contraseña incorrecta. Operación bloqueada", NO ejecutes `realizar_retiro` y responde con ese mensaje.
-4. Nunca ejecutes `realizar_retiro` para montos mayores a 1000 sin una validación exitosa de `bank_fraud_check`.
+   - Si la respuesta es "Transferencia validada con contraseña", procede a `realizar_retiro`.
+   - Si la respuesta es "Riesgo ALTO: Se requiere contraseña para continuar", NO ejecutes `realizar_retiro` y pide la contraseña.
+   - Si la respuesta es "Contraseña incorrecta. Operación bloqueada", NO ejecutes `realizar_retiro`.
+4. Nunca ejecutes `realizar_retiro` para montos mayores a 1000 sin validación exitosa de `bank_fraud_check`.
 5. Siempre responde con confirmación explícita: "Transferencia de [monto] a [destinatario] exitosa. Tu nuevo saldo es [saldo]".
 6. Si ejecutas una herramienta, tu respuesta final DEBE incluir los datos obtenidos de dicha herramienta.
-7. Nunca inventes datos. Si no tienes el saldo actualizado, usa la herramienta correspondiente.
-8. No respondas con una pregunta inmediatamente después de realizar una acción financiera; primero da el informe de éxito.
+7. Nunca inventes datos. Usa siempre las herramientas.
+8. No respondas con una pregunta inmediatamente después de una acción financiera; primero da el informe de éxito.
 RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en un solo mensaje si una depende del éxito de la anterior para evitar errores de validación (Error 400).
 """),
             ("placeholder", "{chat_history}"),
@@ -136,11 +137,10 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
 
         self.tools = [get_user_info, bank_fraud_check, realizar_retiro]
         agent = create_tool_calling_agent(self.llm, self.tools, self.prompt)
-        
-        # handle_tool_errors=True es vital para que el Error 400 no rompa el flujo
+
         self.executor = AgentExecutor(
-            agent=agent, 
-            tools=self.tools, 
+            agent=agent,
+            tools=self.tools,
             verbose=True,
             handle_parsing_errors=True,
             handle_tool_errors=True
@@ -152,6 +152,7 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
             input_messages_key="input",
             history_messages_key="chat_history",
         )
+
         @self.router.post("/chat-voice-to-voice")
         async def chat_voice(session_id: str = Form(...), file: UploadFile = File(...)):
             try:
@@ -159,34 +160,28 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
                 es_real, confianza = verificar_liveness(file_bytes)
 
                 if es_real == 0:
-                    return {
-                        "error": "ACCESO DENEGADO",
-                        "agente_dijo": "Detección de spoofing activada."
-                            }
+                    return {"error": "ACCESO DENEGADO", "agente_dijo": "Detección de spoofing activada."}
 
-            # --- Transcripción con Groq ---
                 transcription = client.audio.transcriptions.create(
-                file=(file.filename, file_bytes),
-                model="whisper-large-v3",
-                response_format="text",
-                                    )
+                    file=(file.filename, file_bytes),
+                    model="whisper-large-v3",
+                    response_format="text",
+                )
                 transcription = limpiar_transcripcion(transcription)
 
                 config = {"configurable": {"session_id": session_id}}
 
-        # --- Ejecución del agente con memoria ---
                 try:
-                    full_response = await self.agent_with_memory.ainvoke(
-                    {"input": transcription}, config=config)
+                    full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
                     text_res = None
 
-                    # Validar estructura del resultado
                     if isinstance(full_response, dict):
                         text_res = full_response.get("output")
                         if not text_res:
-                            intermediate_steps = full_response.get("intermediate_steps")
-                            if intermediate_steps and isinstance(intermediate_steps, list) and len(intermediate_steps) > 0:
-                                text_res = intermediate_steps[-1][1]
+                            steps = full_response.get("intermediate_steps")
+                            if steps and isinstance(steps, list) and len(steps) > 0:
+                                text_res = steps[-1][1]
+
                     if not text_res:
                         text_res = "Operación finalizada. ¿Deseas algo más?"
 
@@ -194,26 +189,21 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
                     print(f"🔴 Error crítico en Agente: {e}")
                     text_res = "Tuve un problema técnico al consultar tu información."
 
-                # --- Conversión a voz ---
                 tts = gTTS(text=str(text_res), lang='es')
                 audio_filename = f"{uuid.uuid4()}.mp3"
                 audio_path = os.path.join("static", audio_filename)
                 tts.save(audio_path)
+
                 return {
-                "usuario_dijo": transcription,
-                "agente_dijo": text_res,
-                "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"}
+                    "usuario_dijo": transcription,
+                    "agente_dijo": text_res,
+                    "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"
+                }
+
             except Exception as e:
                 return {"error": "Error interno", "detalle": str(e)}
 
+
 # --- 5. INICIALIZACIÓN ---
 app = FastAPI(title="Agente Bancario Pro")
-origins = ["https://mattstewart2006-star.github.io"]
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-ai_agent = BankingAgent()
-app.include_router(ai_agent.router)
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+origins = ["https://mattstewart2006-star.github.io"
