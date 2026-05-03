@@ -114,12 +114,15 @@ class BankingAgent:
 
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", f"""Eres el asistente virtual de Banorte para el usuario {USER_DATA['nombre']}.
-            Tu objetivo es ayudar con saldos y transferencias.    
-            REGLAS CRÍTICAS:
-            1. Si el usuario quiere transferir pero NO ha dicho a quién o cuánto, NO uses la herramienta 'realizar_retiro'. Pregúntale educadamente el dato que falta.
-            2. Una vez que tengas el MONTO y el DESTINATARIO, usa la herramienta 'realizar_retiro' inmediatamente.
-            3. No inventes nombres ni montos.
-            4. Responde siempre en español de forma concisa."""),
+            Tu objetivo es gestionar saldos y transferencias.
+
+            INSTRUCCIONES DE FLUJO:
+            1. Si el usuario pregunta por su saldo o cuánto dinero tiene, USA 'get_user_info' de inmediato.
+            2. Si el usuario quiere transferir, PRIMERO usa 'get_user_info' para verificar si tiene dinero suficiente.
+            3. NO preguntes al usuario cuál es su saldo; tú tienes la herramienta para consultarlo.
+            4. Solo usa 'realizar_retiro' cuando tengas el monto y el nombre del destinatario.
+    
+            Responde siempre en español y de forma muy breve."""),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
@@ -161,21 +164,27 @@ class BankingAgent:
                 transcription = limpiar_transcripcion(transcription)
 
                 config = {"configurable": {"session_id": session_id}}
+              # --- Dentro de chat_voice ---
                 try:
+                # Invocamos al agente
                     full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
+    
+                # Validamos que la salida no sea nula o vacía
                     text_res = full_response.get("output")
-                    
-                    # Si el agente hizo la tarea en terminal pero no generó texto final
-                    if not text_res:
-                        text_res = "Operación realizada con éxito. ¿Deseas algo más?"
+    
+                    if not text_res or str(text_res).strip() == "":
+                # Si el modelo ejecutó la herramienta pero no generó texto de cierre
+                        text_res = "Hecho. ¿En qué más puedo ayudarte?"
+        
                 except Exception as e:
-                    print(f"Error en Agente: {e}")
-                    text_res = "Lo siento, tuve un problema técnico. ¿Podrías repetir?"
-
+                    print(f"🔴 Error crítico en Agente: {e}")
+                    # Esto evita que text_res sea None y rompa gTTS
+                    text_res = "Tuve un problema al procesar la solicitud. ¿Podrías intentar de nuevo?"
+                tts = gTTS(text=str(text_res), lang='es')
                 audio_filename = f"{uuid.uuid4()}.mp3"
                 audio_path = os.path.join("static", audio_filename)
                 
-                tts = gTTS(text=str(text_res), lang='es')
+                
                 tts.save(audio_path)
 
                 return {
