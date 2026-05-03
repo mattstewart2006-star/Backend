@@ -5,6 +5,7 @@ import librosa
 import numpy as np
 import joblib
 import io
+import unicodedata
 import soundfile as sf
 from fastapi import FastAPI, APIRouter, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
@@ -68,16 +69,16 @@ def get_user_info() -> str:
     return f"El usuario se llama {USER_DATA['nombre']} y su balance actual es de ${USER_DATA['balance']}."
 
 @tool
-def realizar_retiro(amount: float, destinatario: str = "su propia cuenta") -> str:
-    """Útil para retirar dinero o realizar transferencias. 
-    Requiere el monto numérico (amount) y opcionalmente el nombre del destinatario."""
+def realizar_retiro(amount: float, destinatario: str) -> str:
+    """Ejecuta un retiro o transferencia. 
+    IMPORTANTE: Solo llamar si tienes AMBOS: el monto (amount) y el nombre de la persona (destinatario)."""
     if amount <= 0:
-        return "Monto inválido."
+        return "Error: El monto debe ser mayor a cero."
     if amount > USER_DATA["balance"]:
-        return "Fondos insuficientes en la cuenta."
+        return f"Fondos insuficientes. Tu saldo actual es {USER_DATA['balance']}."
+    
     USER_DATA["balance"] -= amount
-    return f"Retiro/Transferencia exitosa de ${amount} a {destinatario}. Nuevo balance: ${USER_DATA['balance']}."
-
+    return f"OK. Transferencia de ${amount} a {destinatario} realizada. Saldo restante: ${USER_DATA['balance']}."
 @tool
 def bank_fraud_check(amount: float, password: str = None) -> str:
     """Verifica si una transferencia es riesgosa."""
@@ -96,6 +97,8 @@ def get_session_history(session_id: str):
     return SQLChatMessageHistory(session_id=session_id, connection_string="sqlite:///banco.db")
 
 def limpiar_transcripcion(texto: str) -> str:
+    # Quitar acentos y normalizar a ASCII para evitar errores de Unicode en las Tools
+    texto = unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode('ascii')
     texto = texto.strip().lower()
     texto = texto.replace("retirar", "retiro").replace("transferir", "transferencia")
     return texto
@@ -110,12 +113,13 @@ class BankingAgent:
         )
 
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""Eres un asistente bancario experto para {USER_DATA['nombre']}.
-            REGLAS:
-            1. Para consultar saldo: usa 'get_user_info' sin argumentos.
-            2. Para mover dinero: usa 'realizar_retiro'.
-            3. Si falta el monto, pídelo.
-            4. Responde siempre en español de forma breve."""),
+            ("system", f"""Eres el asistente virtual de Banorte para el usuario {USER_DATA['nombre']}.
+            Tu objetivo es ayudar con saldos y transferencias.    
+            REGLAS CRÍTICAS:
+            1. Si el usuario quiere transferir pero NO ha dicho a quién o cuánto, NO uses la herramienta 'realizar_retiro'. Pregúntale educadamente el dato que falta.
+            2. Una vez que tengas el MONTO y el DESTINATARIO, usa la herramienta 'realizar_retiro' inmediatamente.
+            3. No inventes nombres ni montos.
+            4. Responde siempre en español de forma concisa.""",
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
