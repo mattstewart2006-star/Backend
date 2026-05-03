@@ -102,13 +102,19 @@ def bank_fraud_check(amount: float, password: str = None) -> str:
 
 # --- 4. AGENTE BANCARIO ---
 def get_session_history(session_id: str):
-    return SQLChatMessageHistory(session_id=session_id, connection_string="sqlite:///banco.db")
-
+    history = SQLChatMessageHistory(session_id=session_id, connection_string="sqlite:///banco.db")
+    if len(history.messages) > 15:
+        history.messages = history.messages[-15:]
+    return history
+    
 def limpiar_transcripcion(texto: str) -> str:
     texto = unicodedata.normalize('NFKD', texto).encode('ascii', 'ignore').decode('ascii')
     texto = texto.strip().lower()
     texto = texto.replace("retirar", "retiro").replace("transferir", "transferencia")
     return texto
+def contiene_palabra_clave(texto: str) -> bool:
+    claves = ["saldo", "balance"]
+    return any(palabra in texto.lower() for palabra in claves)
 
 class BankingAgent:
     def __init__(self):
@@ -196,23 +202,26 @@ EJEMPLOS DE COMPORTAMIENTO:
                 model="whisper-large-v3",
                 response_format="text",)
                 transcription = limpiar_transcripcion(transcription)
-                config = {"configurable": {"session_id": session_id}}
-                try:
-                    full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-                    text_res = None
-                    if isinstance(full_response, dict):
-                        text_res = full_response.get("output")
+                if contiene_palabra_clave(transcription):
+                    text_res = get_user_info()
+                else:
+                    config = {"configurable": {"session_id": session_id}}
+                    try:
+                        full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
+                        text_res = None
+                        if isinstance(full_response, dict):
+                            text_res = full_response.get("output")
+                            if not text_res:
+                                steps = full_response.get("intermediate_steps")
+                                if steps and isinstance(steps, list) and len(steps) > 0:
+                                    # Log extra para depuración
+                                    print(f"⚠️ Output vacío, usando intermediate_steps: {steps[-1]}")
+                                    text_res = steps[-1][1]
                         if not text_res:
-                            steps = full_response.get("intermediate_steps")
-                            if steps and isinstance(steps, list) and len(steps) > 0:
-                                # Log extra para depuración
-                                print(f"⚠️ Output vacío, usando intermediate_steps: {steps[-1]}")
-                                text_res = steps[-1][1]
-                    if not text_res:
-                        text_res = "Operación finalizada. ¿Deseas algo más?"
-                except Exception as e:
-                    print(f"🔴 Error crítico en Agente: {e}")
-                    text_res = "Tuve un problema técnico al consultar tu información."
+                            text_res = "Operación finalizada. ¿Deseas algo más?"
+                    except Exception as e:
+                        print(f"🔴 Error crítico en Agente: {e}")
+                        text_res = "Tuve un problema técnico al consultar tu información."
                 # --- Conversión a voz ---
                 tts = gTTS(text=str(text_res), lang='es')
                 audio_filename = f"{uuid.uuid4()}.mp3"
