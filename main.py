@@ -145,58 +145,66 @@ class BankingAgent:
             history_messages_key="chat_history",
         )
 
-        @self.router.post("/chat-voice-to-voice")
-        async def chat_voice(session_id: str = Form(...), file: UploadFile = File(...)):
-            try:
-                file_bytes = await file.read()
-                es_real, confianza = verificar_liveness(file_bytes)
+       @self.router.post("/chat-voice-to-voice")
+async def chat_voice(session_id: str = Form(...), file: UploadFile = File(...)):
+    try:
+        file_bytes = await file.read()
+        es_real, confianza = verificar_liveness(file_bytes)
 
-                if es_real == 0:
-                    return {"error": "ACCESO DENEGADO", "agente_dijo": "Detección de spoofing activada."}
+        if es_real == 0:
+            return {
+                "error": "ACCESO DENEGADO",
+                "agente_dijo": "Detección de spoofing activada."
+            }
 
-                transcription = client.audio.transcriptions.create(
-                    file=(file.filename, file_bytes),
-                    model="whisper-large-v3",
-                    response_format="text",
-                )
-                transcription = limpiar_transcripcion(transcription)
+        # --- Transcripción con Groq ---
+        transcription = client.audio.transcriptions.create(
+            file=(file.filename, file_bytes),
+            model="whisper-large-v3",
+            response_format="text",
+        )
+        transcription = limpiar_transcripcion(transcription)
 
-                config = {"configurable": {"session_id": session_id}}
-              # --- Dentro de chat_voice ---
-                try:
-                    full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
+        config = {"configurable": {"session_id": session_id}}
 
-                    text_res = None
+        # --- Ejecución del agente con memoria ---
+        try:
+            full_response = await self.agent_with_memory.ainvoke(
+                {"input": transcription}, config=config
+            )
 
-                    # Intentamos obtener salida final
-                    if isinstance(full_response, dict):
-                        text_res = full_response.get("output")
+            text_res = None
 
-                    # Si no hay salida, buscamos pasos intermedios
-                    if not text_res:
-                        intermediate_steps = full_response.get("intermediate_steps") if isinstance(full_response, dict) else None
-                        if intermediate_steps and isinstance(intermediate_steps, list) and len(intermediate_steps) > 0:
-                            text_res = intermediate_steps[-1][1]
-                        else:
-                            text_res = "Operación finalizada. ¿Deseas algo más?"
-                except Exception as e:
-                    print(f"🔴 Error crítico en Agente: {e}")
-                    text_res = "Tuve un problema técnico al consultar tu información."
-                tts = gTTS(text=str(text_res), lang='es')
-                audio_filename = f"{uuid.uuid4()}.mp3"
-                audio_path = os.path.join("static", audio_filename)
-                
-                
-                tts.save(audio_path)
+            # Validar estructura del resultado
+            if isinstance(full_response, dict):
+                text_res = full_response.get("output")
 
-                return {
-                    "usuario_dijo": transcription,
-                    "agente_dijo": text_res,
-                    "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"
-                }
-            except Exception as e:
-                return {"error": "Error interno", "detalle": str(e)}
+                if not text_res:
+                    intermediate_steps = full_response.get("intermediate_steps")
+                    if intermediate_steps and isinstance(intermediate_steps, list) and len(intermediate_steps) > 0:
+                        text_res = intermediate_steps[-1][1]
 
+            if not text_res:
+                text_res = "Operación finalizada. ¿Deseas algo más?"
+
+        except Exception as e:
+            print(f"🔴 Error crítico en Agente: {e}")
+            text_res = "Tuve un problema técnico al consultar tu información."
+
+        # --- Conversión a voz ---
+        tts = gTTS(text=str(text_res), lang='es')
+        audio_filename = f"{uuid.uuid4()}.mp3"
+        audio_path = os.path.join("static", audio_filename)
+        tts.save(audio_path)
+
+        return {
+            "usuario_dijo": transcription,
+            "agente_dijo": text_res,
+            "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"
+        }
+
+    except Exception as e:
+        return {"error": "Error interno", "detalle": str(e)}
 
 # --- 5. INICIALIZACIÓN ---
 app = FastAPI(title="Agente Bancario Pro")
