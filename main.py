@@ -72,7 +72,8 @@ def get_user_info(query: str = None) -> str:
 
 @tool
 def realizar_retiro(amount: float) -> str:
-    """Realiza un retiro y actualiza el balance del usuario."""
+    """Útil para retirar dinero, hacer transferencias, enviar pagos o mover fondos. 
+    Requiere el monto numérico (amount)."""
     if amount <= 0:
         return "Monto inválido."
     if amount > USER_DATA["balance"]:
@@ -110,7 +111,11 @@ def limpiar_transcripcion(texto: str) -> str:
 class BankingAgent:
     def __init__(self):
         self.router = APIRouter(prefix="/agent", tags=["AI Agent"])
-        self.llm = ChatGroq(model="llama-3.1-8b-instant", temperature=0)
+        self.llm = ChatGroq(
+            model="llama-3.1-8b-instant", 
+            temperature=0,
+            model_kwargs={"tool_choice": "auto"} # Fuerza al modelo a considerar herramientas
+            )
 
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}. "
