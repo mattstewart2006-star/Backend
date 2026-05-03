@@ -113,16 +113,17 @@ class BankingAgent:
         )
 
         self.prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""Eres el asistente virtual de Banorte para el usuario {USER_DATA['nombre']}.
-            Tu objetivo es gestionar saldos y transferencias.
-
-            INSTRUCCIONES DE FLUJO:
-            1. Si el usuario pregunta por su saldo o cuánto dinero tiene, USA 'get_user_info' de inmediato.
-            2. Si el usuario quiere transferir, PRIMERO usa 'get_user_info' para verificar si tiene dinero suficiente.
-            3. NO preguntes al usuario cuál es su saldo; tú tienes la herramienta para consultarlo.
-            4. Solo usa 'realizar_retiro' cuando tengas el monto y el nombre del destinatario.
+            ("system", f"""Eres el asistente virtual de Banorte para {USER_DATA['nombre']}.
     
-            Responde siempre en español y de forma muy breve."""),
+            REGLAS DE RESPUESTA:
+            1. Si usas 'get_user_info', DI el nombre del usuario y su saldo exacto.
+            2. Si usas 'realizar_retiro', DEBES confirmar explícitamente: "Se enviaron [monto] a [destinatario]. Tu nuevo saldo es [saldo]".
+            3. NUNCA respondas con una pregunta vacía como "¿Necesitas algo más?" si acabas de realizar una acción; primero confirma la acción.
+            4. Usa la información que te devuelven las herramientas, no la inventes.
+
+            FLUJO:
+            - Consulta siempre el saldo antes de transferir.
+            - Responde en español, de forma ejecutiva y amable."""),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
@@ -166,20 +167,24 @@ class BankingAgent:
                 config = {"configurable": {"session_id": session_id}}
               # --- Dentro de chat_voice ---
                 try:
-                # Invocamos al agente
                     full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
     
-                # Validamos que la salida no sea nula o vacía
+                    # Intentamos obtener la salida final
                     text_res = full_response.get("output")
     
+                    # SI NO HAY SALIDA FINAL: Verificamos si hubo una ejecución de herramienta exitosa
                     if not text_res or str(text_res).strip() == "":
-                # Si el modelo ejecutó la herramienta pero no generó texto de cierre
-                        text_res = "Hecho. ¿En qué más puedo ayudarte?"
-        
+                    # Buscamos en los pasos intermedios el resultado de la última herramienta
+                        intermediate_steps = full_response.get("intermediate_steps", [])
+                        if intermediate_steps:
+                        # El segundo elemento de la tupla es el resultado de la herramienta
+                            text_res = intermediate_steps[-1][1] 
+                        else:
+                            text_res = "Operación finalizada. ¿Deseas algo más?"
+
                 except Exception as e:
                     print(f"🔴 Error crítico en Agente: {e}")
-                    # Esto evita que text_res sea None y rompa gTTS
-                    text_res = "Tuve un problema al procesar la solicitud. ¿Podrías intentar de nuevo?"
+                    text_res = "Tuve un problema técnico al consultar tu información."
                 tts = gTTS(text=str(text_res), lang='es')
                 audio_filename = f"{uuid.uuid4()}.mp3"
                 audio_path = os.path.join("static", audio_filename)
