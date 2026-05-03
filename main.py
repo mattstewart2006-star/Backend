@@ -62,6 +62,7 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import SQLChatMessageHistory
 
 
+
 @tool
 def get_user_info(query: str = None) -> str:
     """Consulta el nombre del usuario y su balance actual de cuenta."""
@@ -89,7 +90,7 @@ def bank_fraud_check(amount: float, password: str = None) -> str:
             return "Transferencia validada con contraseña."
         else:
             return "Contraseña incorrecta. Operación bloqueada."
-    return "Riesgo BAJO: Operación segura. No se requiere contraseña."
+    return "Riesgo BAJO: Operación segura."
 
 
 # --- 4. AGENTE BANCARIO ---
@@ -112,8 +113,7 @@ class BankingAgent:
 
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}. "
-                       "Siempre que el usuario pregunte por su balance o información de cuenta, usa la herramienta `get_user_info`. "
-                       "Usa `realizar_retiro` para retiros y `bank_fraud_check` solo para transferencias. "
+                       "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes. "
                        "Sé amable y conciso."),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
