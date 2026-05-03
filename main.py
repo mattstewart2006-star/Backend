@@ -151,9 +151,7 @@ class BankingAgent:
                 # LLM Processing
                 config = {"configurable": {"session_id": session_id}}
                 response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-                text_res = response.get("output")
-                if not text_res:
-                    text_res = "Lo siento, no pude procesar tu solicitud."
+                text_res = response["output"]
 
                 # TTS
                 audio_filename = f"{uuid.uuid4()}.mp3"
