@@ -115,15 +115,12 @@ class BankingAgent:
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", f"""Eres el asistente virtual de Banorte para {USER_DATA['nombre']}.
     
-            REGLAS DE RESPUESTA:
-            1. Si usas 'get_user_info', DI el nombre del usuario y su saldo exacto.
-            2. Si usas 'realizar_retiro', DEBES confirmar explícitamente: "Se enviaron [monto] a [destinatario]. Tu nuevo saldo es [saldo]".
-            3. NUNCA respondas con una pregunta vacía como "¿Necesitas algo más?" si acabas de realizar una acción; primero confirma la acción.
-            4. Usa la información que te devuelven las herramientas, no la inventes.
-
-            FLUJO:
-            - Consulta siempre el saldo antes de transferir.
-            - Responde en español, de forma ejecutiva y amable."""),
+    REGLAS ESTRICTAS DE RESPUESTA:
+    1. Antes de realizar cualquier transferencia, SIEMPRE ejecuta 'get_user_info' para validar el saldo.
+    2. Si ejecutas una herramienta, tu respuesta final DEBE incluir los datos obtenidos de dicha herramienta.
+    3. Si usas 'realizar_retiro', confirma textualmente: "Transferencia de [monto] a [destinatario] exitosa. Tu nuevo saldo es [saldo]".
+    4. NUNCA respondas con una pregunta si acabas de realizar una acción financiera; primero da el informe de éxito.
+    5. No inventes datos. Si no tienes el saldo actualizado, pregunta o usa la herramienta."""),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
