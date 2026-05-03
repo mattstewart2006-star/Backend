@@ -71,10 +71,14 @@ from langchain_community.chat_message_histories import SQLChatMessageHistory
 
 @tool
 def get_user_info() -> str:
+     """Útil para cuando el usuario pregunta por su saldo, balance o quién es él.
+    No requiere argumentos."""
     return f"El usuario se llama {USER_DATA['nombre']} y su balance actual es de ${USER_DATA['balance']}."
 
 @tool
 def realizar_retiro(amount: float, destinatario: str) -> str:
+    """Ejecuta un retiro o transferencia.
+    IMPORTANTE: Solo llamar si tienes AMBOS: el monto (amount) y el nombre de la persona (destinatario)."""
     if amount <= 0:
         return "Error: El monto debe ser mayor a cero."
     if amount > USER_DATA["balance"]:
@@ -84,6 +88,8 @@ def realizar_retiro(amount: float, destinatario: str) -> str:
 
 @tool
 def bank_fraud_check(amount: float, password: str = None) -> str:
+    """Verifica si una transferencia es riesgosa.
+    Si el monto es mayor a 1000, requiere contraseña para continuar."""
     if amount > 1000:
         if password is None:
             return "Riesgo ALTO: Se requiere contraseña para continuar."
@@ -207,3 +213,11 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
 # --- 5. INICIALIZACIÓN ---
 app = FastAPI(title="Agente Bancario Pro")
 origins = ["https://mattstewart2006-star.github.io"]
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=["*"], allow_headers=["*"], allow_credentials=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+ai_agent = BankingAgent()
+app.include_router(ai_agent.router)
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)
