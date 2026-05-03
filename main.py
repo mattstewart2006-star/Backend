@@ -118,11 +118,12 @@ class BankingAgent:
 REGLAS DE RESPUESTA:
 1. Si el usuario pide su saldo, usa `get_user_info` y responde con el balance actual.
 2. Si el usuario pide retirar o transferir dinero, identifica el monto y el destinatario en el texto y llama `realizar_retiro(amount, destinatario)`.
-3. Si el monto es mayor a 1000, primero llama `bank_fraud_check(amount, password)` y espera la validación antes de ejecutar la transferencia.
+3. Si el monto es mayor a 1000, primero llama `bank_fraud_check(amount, password)` y espera la validación antes de ejecutar la transferencia.    
 4. Siempre responde con confirmación explícita: "Transferencia de [monto] a [destinatario] exitosa. Tu nuevo saldo es [saldo]".
 5. Si ejecutas una herramienta, tu respuesta final DEBE incluir los datos obtenidos de dicha herramienta.
 6. Nunca inventes datos. Si no tienes el saldo actualizado, usa la herramienta correspondiente.
 7. No respondas con una pregunta inmediatamente después de realizar una acción financiera; primero da el informe de éxito.
+RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en un solo mensaje si una depende del éxito de la anterior para evitar errores de validación (Error 400).
 """),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
