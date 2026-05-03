@@ -165,20 +165,20 @@ class BankingAgent:
               # --- Dentro de chat_voice ---
                 try:
                     full_response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-    
-                    # Intentamos obtener la salida final
-                    text_res = full_response.get("output")
-    
-                    # SI NO HAY SALIDA FINAL: Verificamos si hubo una ejecución de herramienta exitosa
-                    if not text_res or str(text_res).strip() == "":
-                    # Buscamos en los pasos intermedios el resultado de la última herramienta
-                        intermediate_steps = full_response.get("intermediate_steps", [])
-                        if intermediate_steps:
-                        # El segundo elemento de la tupla es el resultado de la herramienta
-                            text_res = intermediate_steps[-1][1] 
+
+                    text_res = None
+
+                    # Intentamos obtener salida final
+                    if isinstance(full_response, dict):
+                        text_res = full_response.get("output")
+
+                    # Si no hay salida, buscamos pasos intermedios
+                    if not text_res:
+                        intermediate_steps = full_response.get("intermediate_steps") if isinstance(full_response, dict) else None
+                        if intermediate_steps and isinstance(intermediate_steps, list) and len(intermediate_steps) > 0:
+                            text_res = intermediate_steps[-1][1]
                         else:
                             text_res = "Operación finalizada. ¿Deseas algo más?"
-
                 except Exception as e:
                     print(f"🔴 Error crítico en Agente: {e}")
                     text_res = "Tuve un problema técnico al consultar tu información."
