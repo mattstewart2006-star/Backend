@@ -113,8 +113,11 @@ class BankingAgent:
 
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}. "
-                       "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes. "
-                       "Sé amable y conciso."),
+               "TU REGLA DE ORO: Si el usuario quiere mover dinero, DEBES usar la herramienta 'realizar_retiro'. "
+               "No confirmes transacciones que no hayas ejecutado a través de una herramienta. "
+               "Si el usuario pide una 'transferencia', trátala como un 'retiro' de su cuenta. "
+               "Si el usuario pide ver el balance o saber el saldo, usa la herramienta 'get_user_info'"
+               "Sé amable y conciso."),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
