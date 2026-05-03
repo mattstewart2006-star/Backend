@@ -203,7 +203,7 @@ EJEMPLOS DE COMPORTAMIENTO:
                 response_format="text",)
                 transcription = limpiar_transcripcion(transcription)
                 if contiene_palabra_clave(transcription):
-                    text_res = get_user_info()
+                    text_res = get_user_info.invoke({})
                 else:
                     config = {"configurable": {"session_id": session_id}}
                     try:
