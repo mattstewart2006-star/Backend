@@ -33,31 +33,46 @@ if not os.path.exists("static"):
 
 
 # --- 2. LÓGICA DE ANTISPOOFING ---
-def verificar_liveness(file_bytes):
-    try:
-        # Convertir a WAV PCM 16 bits, mono, 44.1 kHz
-        y, sr = librosa.load(io.BytesIO(file_bytes), sr=44100, mono=True)
-        temp_path = "temp_liveness.wav"
-        sf.write(temp_path, y, sr, subtype="PCM_16")
+def verificar_liveness(audio_bytes: bytes):
+    """
+    Convierte audio a WAV PCM 16 bits, mono, 44.1kHz.
+    Extrae 3 segundos para el modelo antispoofing.
+    Devuelve mensaje de acceso denegado si es spoofing.
+    """
+    # Convertir a WAV PCM 16 bits, mono, 44.1kHz
+    audio_data, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
+    if audio_data.ndim > 1:
+        audio_data = librosa.to_mono(audio_data.T)
+    audio_data = librosa.resample(audio_data, orig_sr=sr, target_sr=44100)
+    sr = 44100
 
-        # Extraer características
-        mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
-        mfccs_scaled = np.mean(mfccs.T, axis=0)
-        rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
-        rolloff_scaled = np.mean(rolloff)
-        features = np.hstack([mfccs_scaled, rolloff_scaled]).reshape(1, -1)
+    # Recortar a 3 segundos para el modelo
+    y = audio_data[:sr*3]
 
-        # Predicción con el modelo
-        prediccion = MODELO_LIVENESS.predict(features)[0]
-        probabilidades = MODELO_LIVENESS.predict_proba(features)[0]
-        return prediccion, probabilidades[prediccion]
+    # Extraer características
+    mfccs = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=40)
+    mfccs_scaled = np.mean(mfccs.T, axis=0)
+    rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+    rolloff_scaled = np.mean(rolloff)
+    feat = np.hstack([mfccs_scaled, rolloff_scaled]).reshape(1, -1)
 
-    except Exception as e:
-        print(f"⚠️ Error en liveness: {e}")
-        return None, 0
-    finally:
-        if os.path.exists("temp_liveness.wav"):
-            os.remove("temp_liveness.wav")
+    # Predicción
+    prediccion = MODELO_LIVENESS.predict(feat)[0]
+    probabilidades = MODELO_LIVENESS.predict_proba(feat)[0]
+    confianza = probabilidades[prediccion] * 100
+
+    if prediccion == 0:
+        return {
+            "status": "denegado",
+            "mensaje": f"❌ Acceso denegado: intento de grabación detectado (confianza {confianza:.2f}%)"
+        }
+    else:
+        return {
+            "status": "permitido",
+            "mensaje": f"✅ Voz real detectada (confianza {confianza:.2f}%)",
+            "audio_wav": audio_data,  # audio completo para transcripción/agent
+            "sr": sr
+        }
 
 
 # --- 3. TOOLS (HERRAMIENTAS OPTIMIZADAS) ---
