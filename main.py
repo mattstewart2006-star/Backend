@@ -71,7 +71,7 @@ from langchain_community.chat_message_histories import SQLChatMessageHistory
 
 @tool
 def get_user_info() -> str:
-     """Útil para cuando el usuario pregunta por su saldo, balance o quién es él.
+    """Útil para cuando el usuario pregunta por su saldo, balance o quién es él.
     No requiere argumentos."""
     return f"El usuario se llama {USER_DATA['nombre']} y su balance actual es de ${USER_DATA['balance']}."
 
