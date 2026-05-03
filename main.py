@@ -198,8 +198,8 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
                 "usuario_dijo": transcription,
                 "agente_dijo": text_res,
                 "url_audio": f"https://backend-1k3i.onrender.com/static/{audio_filename}"}
-        except Exception as e:
-            return {"error": "Error interno", "detalle": str(e)}
+            except Exception as e:
+                return {"error": "Error interno", "detalle": str(e)}
 
 
 # --- 5. INICIALIZACIÓN ---
