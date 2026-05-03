@@ -18,7 +18,7 @@ client = Groq(api_key=os.environ["GROQ_API_KEY"])
 USER_DATA = {
     "nombre": "Matthew",
     "balance": 15000.0,
-    "password": "BanorteSeguro"  # Contraseña simulada
+    "password": "banorte seguro"  # Contraseña simulada
 }
 
 try:
@@ -62,7 +62,6 @@ from langchain_core.runnables.history import RunnableWithMessageHistory
 from langchain_community.chat_message_histories import SQLChatMessageHistory
 
 
-
 @tool
 def get_user_info(query: str = None) -> str:
     """Consulta el nombre del usuario y su balance actual de cuenta."""
@@ -83,14 +82,14 @@ def realizar_retiro(amount: float) -> str:
 @tool
 def bank_fraud_check(amount: float, password: str = None) -> str:
     """Verifica si una transferencia es riesgosa y pide contraseña si es necesario."""
-    if amount > 10000:
+    if amount > 1000:
         if password is None:
             return "Riesgo ALTO: Se requiere contraseña para continuar."
         elif password == USER_DATA["password"]:
             return "Transferencia validada con contraseña."
         else:
             return "Contraseña incorrecta. Operación bloqueada."
-    return "Riesgo BAJO: Operación segura."
+    return "Riesgo BAJO: Operación segura. No se requiere contraseña."
 
 
 # --- 4. AGENTE BANCARIO ---
@@ -113,7 +112,8 @@ class BankingAgent:
 
         self.prompt = ChatPromptTemplate.from_messages([
             ("system", f"Eres un asistente bancario para {USER_DATA['nombre']}. "
-                       "Puedes dar información sobre el balance de cuenta, realizar retiros y validar fraudes. "
+                       "Siempre que el usuario pregunte por su balance o información de cuenta, usa la herramienta `get_user_info`. "
+                       "Usa `realizar_retiro` para retiros y `bank_fraud_check` solo para transferencias. "
                        "Sé amable y conciso."),
             ("placeholder", "{chat_history}"),
             ("human", "{input}"),
@@ -151,7 +151,9 @@ class BankingAgent:
                 # LLM Processing
                 config = {"configurable": {"session_id": session_id}}
                 response = await self.agent_with_memory.ainvoke({"input": transcription}, config=config)
-                text_res = response["output"]
+                text_res = response.get("output")
+                if not text_res:
+                    text_res = "Lo siento, no pude procesar tu solicitud."
 
                 # TTS
                 audio_filename = f"{uuid.uuid4()}.mp3"
