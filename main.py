@@ -206,4 +206,4 @@ RESTRICCIÓN TÉCNICA: No intentes realizar múltiples llamadas a funciones en u
 
 # --- 5. INICIALIZACIÓN ---
 app = FastAPI(title="Agente Bancario Pro")
-origins = ["https://mattstewart2006-star.github.io"
+origins = ["https://mattstewart2006-star.github.io"]
